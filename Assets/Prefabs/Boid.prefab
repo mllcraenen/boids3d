@@ -13,7 +13,6 @@ GameObject:
   - component: {fileID: 6416514134823102842}
   - component: {fileID: 6416514134823102843}
   - component: {fileID: 6416514134823102836}
-  - component: {fileID: -6533396183037942347}
   m_Layer: 0
   m_Name: Boid
   m_TagString: Untagged
@@ -115,17 +114,3 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   isDebugBoid: 0
---- !u!136 &-6533396183037942347
-CapsuleCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6416514134823102837}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  m_Radius: 0.35
-  m_Height: 0.188
-  m_Direction: 1
-  m_Center: {x: 0, y: 0, z: 0}

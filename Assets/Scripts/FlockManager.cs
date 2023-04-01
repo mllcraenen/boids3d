@@ -25,15 +25,15 @@ public class FlockManager : MonoBehaviour
     public float visionAngle;
 
     [Header("Flocking config")]
-    [Range(0.0f, 1.0f)]
+    [Range(0.0f, 15.0f)]
     public float separation;
-    [Range(0.0f, 1.0f)]
+    [Range(0.0f, 15.0f)]
     public float alignment;
-    [Range(0.0f, 1.0f)]
+    [Range(0.0f, 15.0f)]
     public float cohesion;
-    [Range(0.0f, 1.0f)]
+    [Range(0.0f, 15.0f)]
     public float targeting;
-    [Range(0.0f, 1.0f)]
+    [Range(0.0f, 15.0f)]
     public float collisionAvoidance;
 
     [Header("Collision avoidance config")]
@@ -72,8 +72,12 @@ public class FlockManager : MonoBehaviour
             Vector3 pos = this.transform.position + new Vector3(Random.Range(-roomLimit.x, roomLimit.x),
                                                                 Random.Range(-roomLimit.y, roomLimit.y),
                                                                 Random.Range(-roomLimit.z, roomLimit.z));
-            boids[i] = Instantiate(boidPrefab, pos, Quaternion.identity);
+            Quaternion rot = Quaternion.Euler(new Vector3(Random.Range(-180, 180),
+                                                                Random.Range(-180, 180),
+                                                                Random.Range(-180, 180)));
+            boids[i] = Instantiate(boidPrefab, pos, rot);
 		}
+        boids[0].GetComponent<BoidBehaviour>().isDebugBoid = true;
         goalPos = this.transform.position;
     }
 }
