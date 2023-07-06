@@ -1,49 +1,42 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 public class BoidBehaviour : MonoBehaviour
 {
-    /**
-     *  Boid flocking requires 3 input forces:
-     *  - Separation:   Avoid collision
-     *  - Alignment:    Align with average flock heading
-     *  - Cohesion:     Move toward average position of flock
-     */
-
     public bool isDebugBoid = false;
     float speed = 1;
     Vector3 velocity = new Vector3();
     static FlockManager config;
     Food target;
-    float twoRSquared;
-    float visionConeWidth;
 
-    public int fatigue;
+    [HideInInspector]
+    public Vector3 flockHeading;
+    [HideInInspector]
+    public Vector3 flockCenter;
+    [HideInInspector]
+    public Vector3 separationHeading;
+    [HideInInspector]
+    public int flockmates = 0;
+	Vector3 vCohesionGizmoLoc = Vector3.zero;
+
+	public int fatigue;
     public int hunger;
-
-    //TODO: Factor this out to not be recalculated every frame at some point
-
-    //factored out for gizmo drawing purposes
-    RaycastHit hit;
 
     private void Awake() {
         config = FindObjectOfType<FlockManager>();
         if (config == null) Debug.LogError("FlockManager script not found in the scene.");
         target = FindObjectOfType<Food>(); 
         if (target == null) Debug.LogError("Food not found in the scene.");
-
-
-        twoRSquared = (2 * Mathf.Pow(config.visionRange, 2));
-        visionConeWidth = Mathf.Sqrt(twoRSquared - twoRSquared * Mathf.Cos(config.visionAngle));
     }
 	void Start() {
         float startSpeed = (config.minSpeed + config.maxSpeed) / 2;
         velocity = transform.forward * startSpeed;
 
         if (isDebugBoid) {
-            GetComponent<Renderer>().material.SetColor("_Color", Color.red);
-        }
+            GetComponentInChildren<Renderer>().material.SetColor("_Color", Color.black);
+        } else GetComponentInChildren<Renderer>().material.SetColor("_Color", new Color(Random.Range(0f, 1f), Random.Range(0f, 1f), Random.Range(0f, 1f)));
     }
 
 	void Update()
@@ -53,70 +46,86 @@ public class BoidBehaviour : MonoBehaviour
         if (Random.Range(0f, 1f) < .01f)
             hunger++;
 
-        calculateNeighbors();
-        transform.Translate(Vector3.forward * speed * Time.deltaTime);
+		updateBoid();
     }
 
-    void calculateNeighbors() {
-        GameObject[] neighbors = config.boids;
+    public void updateBoid() {
+        /**/
+        GameObject[] neighbors = config.boidObjects;
         Vector3 vCohesion = Vector3.zero;
         Vector3 vSeparation = Vector3.zero;
         Vector3 vAlignment = Vector3.zero;
-        Vector3 vTarget = Vector3.zero;
-        Vector3 vCollisionAvoidance = steerTowards(getCollisionAvoidanceVector(), config.collisionAvoidance);
 
         int neighborCount = 0;
 
-        foreach(GameObject neighbor in neighbors) {
-            if(neighbor != this) {
+        foreach (GameObject neighbor in neighbors) {
+            if (neighbor != this.gameObject) {
                 float distance = Vector3.Distance(neighbor.transform.position, this.transform.position);
-                if(distance <= config.visionRange) {
-                    // Add the vector to the neighbor to be averaged later for the cohesion force
+                if (distance <= config.visionRange && Vector3.Dot(this.transform.forward, neighbor.transform.position - this.transform.position) > config.visionAngleDotProduct) {
                     vCohesion += neighbor.transform.position - transform.position;
-					if (isDebugBoid) {
-                        Debug.DrawRay(transform.position, neighbor.transform.position - transform.position, Color.red);
-					}
-                    // Add the forward direction of the neighbor to be averaged later for the alignment force
                     vAlignment += neighbor.transform.forward;
-
                     neighborCount++;
 
                     //TODO: config.separation does not reflect a distance directly. Rewrite this to not be an if, but just scale the separation vector based on distance raised to a power sth sth
-                    // If the neighbor is too close, steer away
-                    if(distance < config.separation) {
+                    if (distance < config.separation) {
                         vSeparation += (this.transform.position - neighbor.transform.position);
-					}
-				}
-			}
-		}
+                    }
+                }
+            }
+        }
+		/**/
 
-        if (neighborCount > 0) {
-            // Calculate average cohesion force from the summed vectors
-            vCohesion /= neighborCount;
-            vCohesion = steerTowards(vCohesion, config.cohesion);
-            // Calculate average alignment force from the summed vectors
-            vAlignment /= neighborCount;
-            vAlignment = steerTowards(vAlignment, config.alignment);
-            // Calculate targeting force
-            vTarget = steerTowards((target.transform.position - this.transform.position), config.targeting);
-
+		if (neighborCount > 0) {
+			vCohesion /= neighborCount;
+			vCohesionGizmoLoc = vCohesion;
+			vCohesion= steerTowards(vCohesion) * config.cohesion;
+			vAlignment /= neighborCount;
+			vAlignment = steerTowards(vAlignment) * config.alignment;
+			/*
             if(isDebugBoid) {
                 Debug.DrawRay(transform.position, vCohesion, Color.magenta);
                 Debug.DrawRay(transform.position, vAlignment, Color.blue);
+                Debug.DrawRay(transform.position, vSeparation, Color.green);
+                Debug.DrawRay(transform.position, vTarget, Color.red);
             }
+            */
+		}
 
+		//if (flockmates > 0) {
+		//	flockCenter /= flockmates;
+		//	vCohesionGizmoLoc = flockCenter;
+		//	flockCenter = steerTowards(flockCenter) * config.cohesion;
+		//	flockHeading /= flockmates;
+		//	flockHeading = steerTowards(flockHeading) * config.alignment;
+		//	/*
+  //          if(isDebugBoid) {
+  //              Debug.DrawRay(transform.position, vCohesion, Color.magenta);
+  //              Debug.DrawRay(transform.position, vAlignment, Color.blue);
+  //              Debug.DrawRay(transform.position, vSeparation, Color.green);
+  //              Debug.DrawRay(transform.position, vTarget, Color.red);
+  //          }
+  //          */
+		//}
+
+		Vector3 targetHeading = steerTowards((target.transform.position - transform.position)) * config.targeting;
+
+		Vector3 heading = Vector3.zero;
+		if (LagueIsHeadingForCollision()) {
+            Vector3 collisionAvoidDir = LagueObstacleRays();
+            Vector3 collisionAvoidForce = steerTowards(collisionAvoidDir) * config.collisionAvoidance;
+            heading += collisionAvoidForce;
         }
 
-        Vector3 heading = Vector3.zero;
-        heading += vSeparation;
         heading += vCohesion;
         heading += vAlignment;
-        heading += vCollisionAvoidance;
-        heading += vTarget;
+        heading += vSeparation;
+        //heading += separationHeading;
+        //heading += flockHeading;
+        //heading += flockCenter;
+        heading += targetHeading;
 
-
-        // The previous frame's velocity vector plus the heading calculated above is used 
-        velocity += heading * Time.deltaTime;
+		// The previous frame's velocity vector plus the heading calculated above is used
+		velocity += heading * Time.deltaTime;
         speed = velocity.magnitude;
         Vector3 dir = velocity / speed;
         speed = Mathf.Clamp(speed, config.minSpeed, config.maxSpeed);
@@ -129,22 +138,35 @@ public class BoidBehaviour : MonoBehaviour
     /**
      * Gives a vector steering the boid to the target position. `configMultiplier` is a config variable like the separation strength parameter defined for all boids.
      */
-    Vector3 steerTowards(Vector3 target, float configMultiplier = 1) {
-        Vector3 v = target.normalized * (config.maxSpeed * configMultiplier);
-        return Vector3.ClampMagnitude(v, config.rotationSpeed);
+    Vector3 steerTowards(Vector3 target) {
+        Vector3 v = target.normalized * config.maxSpeed;
+        return Vector3.ClampMagnitude(v, config.maxSteerForce);
     }
 
-    private Vector3 getCollisionAvoidanceVector() {
-        //TODO: probably not use visionRange for collision avoidance but something a bit closer, dont want to start avoiding as soon as you can see something that might be a bit much.
-        if (Physics.SphereCast(transform.position, visionConeWidth / 2, transform.forward, out hit, config.visionRange)) {
-            return velocity + (hit.normal * 2);
+	bool LagueIsHeadingForCollision() {
+        RaycastHit hit;
+        return Physics.SphereCast(transform.position, config.collisionAvoidBounds, transform.forward, out hit, config.collisionAvoidDst);
+    }
+
+    Vector3 LagueObstacleRays() {
+        Vector3[] rayDirections = config.collisionPoints;
+        for (int i = 0; i < rayDirections.Length; i++) {
+            // use cached transform here? lague does, it's the previous frame's transform
+            Vector3 dir = transform.TransformDirection(rayDirections[i]);
+            Ray ray = new Ray(transform.position, dir);
+            if (!Physics.SphereCast(ray, config.collisionAvoidBounds, config.collisionAvoidDst)) {
+                return dir;
+            } 
         }
-        else return transform.forward;
+        return transform.forward;
     }
 
-	private void OnDrawGizmos() {
-        //config = FindObjectOfType<FlockManager>();
-        //DebugPainter.drawPoint(hit.point, 0.1f, Color.red);
-        //DebugPainter.drawPoint(transform.position, 0.05f, Color.black);
+
+    private void OnDrawGizmos() {
+        if(isDebugBoid) {
+            // Draw the flock center (vCohesion)
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawSphere(transform.position + vCohesionGizmoLoc, 0.1f);
+        }
     }
 }

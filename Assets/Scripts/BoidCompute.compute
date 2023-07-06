@@ -1,0 +1,35 @@
+// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+struct Boid {
+    float3 pos;
+    float3 dir;
+    float3 flockHeading;
+    float3 flockCenter;
+    float3 flockEvasion;
+    int flockmates;
+};
+
+RWStructuredBuffer<Boid> boids;
+int numBoids;
+float viewRadius;
+float evadeRadius;
+
+[numthreads(8,8,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    // for each other boid, if it's within the view radius, add it to the flock
+    for (int boidIdx = 0; boidIdx < numBoids; boidIdx++) {
+        if (boidIdx == id.x) continue;
+        float3 diff = boids[boidIdx].pos - boids[id.x].pos;
+        float dist = length(diff);
+        if (dist < viewRadius) {
+            boids[id.x].flockmates++;
+            boids[id.x].flockHeading += boids[boidIdx].dir;
+            boids[id.x].flockCenter += boids[boidIdx].pos;
+            if (dist < evadeRadius) {
+                boids[id.x].flockEvasion -= diff / (dist * dist);
+            }
+        }
+    }
+}
