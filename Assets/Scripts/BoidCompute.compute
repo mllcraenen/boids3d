@@ -1,5 +1,6 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
+static const int threadGroupSize = 1024;
 
 struct Boid {
     float3 pos;
@@ -15,7 +16,7 @@ int numBoids;
 float viewRadius;
 float evadeRadius;
 
-[numthreads(8,8,1)]
+[numthreads(1024,1,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     // for each other boid, if it's within the view radius, add it to the flock
